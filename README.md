@@ -1,6 +1,6 @@
 # WideFork 🔗
 
-![ ]( )
+![Notas do Dev](https://github.com/HGBits/WideFork/blob/2ff56e8f813da7686e378b1cf797fd00f11284ba/Extra.md)
 
 > WidFork It is a native Android application designed to simplify the management of links and a Git repository.
 It provides a simple and efficient way to store, organize, and open links, as well as manage a local repository.
