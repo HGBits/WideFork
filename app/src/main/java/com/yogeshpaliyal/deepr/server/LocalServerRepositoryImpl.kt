@@ -142,11 +142,52 @@ open class LocalServerRepositoryImpl(
                             }
                         }
 
+                        get("/api/profiles") {
+                            try {
+                                val profiles = deeprQueries.getAllProfiles().executeAsList()
+                                val response =
+                                    profiles.map { profile ->
+                                        ProfileResponse(
+                                            id = profile.id,
+                                            name = profile.name,
+                                            createdAt = profile.createdAt,
+                                        )
+                                    }
+                                call.respond(HttpStatusCode.OK, response)
+                            } catch (e: Exception) {
+                                Log.e("LocalServer", "Error getting profiles", e)
+                                call.respond(
+                                    HttpStatusCode.InternalServerError,
+                                    ErrorResponse("Error getting profiles: ${e.message}"),
+                                )
+                            }
+                        }
+
+                        post("/api/profiles") {
+                            try {
+                                val request = call.receive<AddProfileRequest>()
+                                deeprQueries.insertProfile(request.name)
+                                call.respond(
+                                    HttpStatusCode.Created,
+                                    SuccessResponse("Profile created successfully"),
+                                )
+                            } catch (e: Exception) {
+                                Log.e("LocalServer", "Error creating profile", e)
+                                call.respond(
+                                    HttpStatusCode.InternalServerError,
+                                    ErrorResponse("Error creating profile: ${e.message}"),
+                                )
+                            }
+                        }
+
                         get("/api/links") {
                             try {
+                                val profileId =
+                                    call.request.queryParameters["profileId"]?.toLongOrNull() ?: 1L
                                 val links =
                                     deeprQueries
                                         .getLinksAndTags(
+                                            profileId,
                                             "",
                                             "",
                                             "",
@@ -154,7 +195,6 @@ open class LocalServerRepositoryImpl(
                                             -1L,
                                             "",
                                             "",
-                                            0L,
                                             "DESC",
                                             "createdAt",
                                             "DESC",
@@ -167,6 +207,7 @@ open class LocalServerRepositoryImpl(
                                             link = link.link,
                                             name = link.name,
                                             createdAt = link.createdAt,
+                                            isFavourite = link.isFavourite,
                                             openedCount = link.openedCount,
                                             notes = link.notes,
                                             thumbnail = link.thumbnail,
@@ -191,35 +232,13 @@ open class LocalServerRepositoryImpl(
                                 val request = call.receive<AddLinkRequest>()
                                 // Insert the link without tags first
                                 accountViewModel.insertAccount(
-                                    request.link,
-                                    request.name,
-                                    false,
-                                    request.tags.map { it.toDbTag() },
-                                    request.notes,
-                                )
-                                call.respond(
-                                    HttpStatusCode.Created,
-                                    SuccessResponse("Link added successfully"),
-                                )
-                            } catch (e: Exception) {
-                                Log.e("LocalServer", "Error adding link", e)
-                                call.respond(
-                                    HttpStatusCode.InternalServerError,
-                                    ErrorResponse("Error adding link: ${e.message}"),
-                                )
-                            }
-                        }
-
-                        post("/api/links") {
-                            try {
-                                val request = call.receive<AddLinkRequest>()
-                                // Insert the link without tags first
-                                accountViewModel.insertAccount(
-                                    request.link,
-                                    request.name,
-                                    false,
-                                    request.tags.map { it.toDbTag() },
-                                    request.notes,
+                                    link = request.link,
+                                    name = request.name,
+                                    executed = false,
+                                    tagsList = request.tags.map { it.toDbTag() },
+                                    notes = request.notes,
+                                    thumbnail = "",
+                                    profileId = request.profileId,
                                 )
                                 call.respond(
                                     HttpStatusCode.Created,
@@ -244,6 +263,7 @@ open class LocalServerRepositoryImpl(
                                         val linkCount =
                                             deeprQueries
                                                 .getLinksAndTags(
+                                                    1L, // Default profile
                                                     "",
                                                     "",
                                                     "",
@@ -251,7 +271,6 @@ open class LocalServerRepositoryImpl(
                                                     -1L,
                                                     tag.id.toString(),
                                                     tag.id.toString(),
-                                                    1L,
                                                     "DESC",
                                                     "createdAt",
                                                     "DESC",
@@ -306,6 +325,24 @@ open class LocalServerRepositoryImpl(
                                 call.respond(
                                     HttpStatusCode.InternalServerError,
                                     ErrorResponse("Error getting link info: ${e.message}"),
+                                )
+                            }
+                        }
+
+                        post("/api/links/increment-count") {
+                            try {
+                                val id = call.request.queryParameters["id"]?.toLongOrNull()
+                                if (id != null) {
+                                    accountViewModel.incrementOpenedCount(id)
+                                    call.respond(HttpStatusCode.OK, SuccessResponse("Count incremented"))
+                                } else {
+                                    call.respond(HttpStatusCode.BadRequest, ErrorResponse("Invalid link ID"))
+                                }
+                            } catch (e: Exception) {
+                                Log.e("LocalServer", "Error incrementing count", e)
+                                call.respond(
+                                    HttpStatusCode.InternalServerError,
+                                    ErrorResponse("Error incrementing count: ${e.message}"),
                                 )
                             }
                         }
@@ -384,12 +421,15 @@ open class LocalServerRepositoryImpl(
         deeprQueries.transaction {
             links.forEach { deeplink ->
                 if (deeprQueries.getDeeprByLink(deeplink.link).executeAsList().isEmpty()) {
-                    deeprQueries.insertDeepr(
+                    deeprQueries.importDeepr(
                         link = deeplink.link,
                         name = deeplink.name,
                         openedCount = deeplink.openedCount,
                         notes = deeplink.notes,
                         thumbnail = deeplink.thumbnail,
+                        isFavourite = deeplink.isFavourite,
+                        createdAt = deeplink.createdAt,
+                        profileId = 1L, // Default profile
                     )
 
                     val insertedId = deeprQueries.lastInsertRowId().executeAsOne()
@@ -400,13 +440,6 @@ open class LocalServerRepositoryImpl(
                         deeprQueries.addTagToLink(
                             linkId = insertedId,
                             tagId = tag.id,
-                        )
-                    }
-
-                    if (deeplink.isFavourite) {
-                        deeprQueries.setFavourite(
-                            isFavourite = 1,
-                            id = insertedId,
                         )
                     }
                 }
@@ -478,7 +511,7 @@ data class LinkResponse(
     val openedCount: Long,
     val notes: String,
     val thumbnail: String,
-    val isFavourite: Boolean = false,
+    val isFavourite: Long,
     val tags: List<String>,
 )
 
@@ -496,6 +529,19 @@ data class AddLinkRequest(
     val name: String,
     val notes: String = "",
     val tags: List<TagData> = emptyList(),
+    val profileId: Long = 1L,
+)
+
+@Serializable
+data class ProfileResponse(
+    val id: Long,
+    val name: String,
+    val createdAt: String,
+)
+
+@Serializable
+data class AddProfileRequest(
+    val name: String,
 )
 
 @Serializable

@@ -8,14 +8,12 @@ import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
 import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.aspectRatio
-import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
@@ -30,37 +28,29 @@ import androidx.compose.material3.FilterChip
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.SwipeToDismissBox
-import androidx.compose.material3.SwipeToDismissBoxDefaults
-import androidx.compose.material3.SwipeToDismissBoxValue
 import androidx.compose.material3.Text
-import androidx.compose.material3.rememberSwipeToDismissBoxState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
-import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.clip
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
-import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import coil3.compose.AsyncImage
 import com.yogeshpaliyal.deepr.GetLinksAndTags
 import com.yogeshpaliyal.deepr.R
 import com.yogeshpaliyal.deepr.Tags
+import com.yogeshpaliyal.deepr.ui.getDeeprItemBackgroundColor
+import com.yogeshpaliyal.deepr.ui.getDeeprItemTextColor
 import compose.icons.TablerIcons
 import compose.icons.tablericons.DotsVertical
-import compose.icons.tablericons.Edit
-import compose.icons.tablericons.Trash
-import kotlinx.coroutines.launch
 import java.text.DateFormat
 import java.text.SimpleDateFormat
 import java.util.Locale
@@ -73,6 +63,10 @@ sealed class MenuItem(
         item: GetLinksAndTags,
     ) : MenuItem(item)
 
+    class Copy(
+        item: GetLinksAndTags,
+    ) : MenuItem(item)
+
     class Shortcut(
         item: GetLinksAndTags,
     ) : MenuItem(item)
@@ -82,6 +76,14 @@ sealed class MenuItem(
     ) : MenuItem(item)
 
     class FavouriteClick(
+        item: GetLinksAndTags,
+    ) : MenuItem(item)
+
+    class OpenWith(
+        item: GetLinksAndTags,
+    ) : MenuItem(item)
+
+    class Share(
         item: GetLinksAndTags,
     ) : MenuItem(item)
 
@@ -100,23 +102,10 @@ sealed class MenuItem(
     class MoreOptionsBottomSheet(
         item: GetLinksAndTags,
     ) : MenuItem(item)
-}
 
-@Composable
-@Preview
-private fun DeeprItemPreview() {
-    DeeprItem(
-        account =
-            createDeeprObject(
-                name = "Yogesh Paliyal",
-                link = "https://yogeshpaliyal.com",
-                thumbnail = "https://yogeshpaliyal.com/og.png",
-            ),
-        {},
-        {},
-        listOf(),
-        isThumbnailEnable = true,
-    )
+    class ViewNote(
+        item: GetLinksAndTags,
+    ) : MenuItem(item)
 }
 
 @OptIn(ExperimentalFoundationApi::class)
@@ -128,6 +117,7 @@ fun DeeprItem(
     selectedTag: List<Tags>,
     isThumbnailEnable: Boolean,
     modifier: Modifier = Modifier,
+    showOpenCounter: Boolean = true,
     analyticsManager: com.yogeshpaliyal.deepr.analytics.AnalyticsManager = org.koin.compose.koinInject(),
 ) {
     var tagsExpanded by remember { mutableStateOf(false) }
@@ -137,97 +127,15 @@ fun DeeprItem(
 
     val linkCopied = stringResource(R.string.link_copied)
 
-    val dismissState =
-        rememberSwipeToDismissBoxState(
-            initialValue = SwipeToDismissBoxValue.Settled,
-            positionalThreshold = SwipeToDismissBoxDefaults.positionalThreshold,
-        )
-
-    val scope = rememberCoroutineScope()
-
-    SwipeToDismissBox(
-        modifier =
-            modifier
-                .fillMaxSize()
-                .clip(RoundedCornerShape(8.dp)),
-        state = dismissState,
-        onDismiss = {
-            scope.launch {
-                dismissState.reset()
-            }
-            when (it) {
-                SwipeToDismissBoxValue.EndToStart -> {
-                    onItemClick(MenuItem.Delete(account))
-                    false
-                }
-
-                SwipeToDismissBoxValue.StartToEnd -> {
-                    onItemClick(MenuItem.Edit(account))
-                    false
-                }
-
-                else -> {
-                    false
-                }
-            }
-        },
-        backgroundContent = {
-            when (dismissState.dismissDirection) {
-                SwipeToDismissBoxValue.StartToEnd -> {
-                    Box(
-                        modifier =
-                            Modifier
-                                .background(
-                                    Color.Gray.copy(alpha = 0.5f),
-                                ).fillMaxSize()
-                                .clip(
-                                    RoundedCornerShape(8.dp),
-                                ),
-                        contentAlignment = Alignment.CenterStart,
-                    ) {
-                        Icon(
-                            imageVector = TablerIcons.Edit,
-                            contentDescription = stringResource(R.string.edit),
-                            tint = Color.White,
-                            modifier = Modifier.padding(16.dp),
-                        )
-                    }
-                }
-
-                SwipeToDismissBoxValue.EndToStart -> {
-                    Box(
-                        modifier =
-                            Modifier
-                                .background(
-                                    Color.Red.copy(alpha = 0.5f),
-                                ).fillMaxSize()
-                                .clip(
-                                    RoundedCornerShape(8.dp),
-                                ),
-                        contentAlignment = Alignment.CenterEnd,
-                    ) {
-                        Icon(
-                            imageVector = TablerIcons.Trash,
-                            contentDescription = stringResource(R.string.delete),
-                            tint = Color.White,
-                            modifier = Modifier.padding(16.dp),
-                        )
-                    }
-                }
-
-                else -> {
-                    Color.White
-                }
-            }
-        },
-    ) {
+    DeeprItemSwipable(account, onItemClick, modifier) {
         Card(
             colors =
                 CardDefaults.cardColors(
-                    containerColor = MaterialTheme.colorScheme.surfaceContainerHighest,
+                    containerColor = getDeeprItemBackgroundColor(account.isFavourite),
                 ),
             modifier =
                 Modifier
+                    .testTag("DeeprItem")
                     .fillMaxWidth()
                     .combinedClickable(
                         onClick = { onItemClick(MenuItem.Click(account)) },
@@ -276,6 +184,7 @@ fun DeeprItem(
                                 maxLines = 1,
                                 overflow = TextOverflow.Ellipsis,
                                 style = MaterialTheme.typography.labelLarge,
+                                color = getDeeprItemTextColor(account.isFavourite),
                             )
                         }
                         Text(
@@ -283,13 +192,14 @@ fun DeeprItem(
                             maxLines = 1,
                             overflow = TextOverflow.Ellipsis,
                             style = MaterialTheme.typography.bodySmall,
+                            color = getDeeprItemTextColor(account.isFavourite),
                         )
                         Spacer(modifier = Modifier.height(4.dp))
                         Row(verticalAlignment = Alignment.CenterVertically) {
                             Text(
                                 text = formatDateTime(account.createdAt),
                                 style = MaterialTheme.typography.bodySmall,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                color = getDeeprItemTextColor(account.isFavourite),
                             )
                         }
                     }
@@ -311,12 +221,7 @@ fun DeeprItem(
                                         } else {
                                             stringResource(R.string.add_to_favourites)
                                         },
-                                    tint =
-                                        if (account.isFavourite == 1L) {
-                                            MaterialTheme.colorScheme.primary
-                                        } else {
-                                            MaterialTheme.colorScheme.onSurface
-                                        },
+                                    tint = getDeeprItemTextColor(account.isFavourite),
                                     modifier = Modifier.size(28.dp),
                                 )
                             }
@@ -335,11 +240,13 @@ fun DeeprItem(
                             }
                         }
 
-                        Text(
-                            text = stringResource(R.string.opened_count, account.openedCount),
-                            style = MaterialTheme.typography.bodySmall,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        )
+                        if (showOpenCounter) {
+                            Text(
+                                text = stringResource(R.string.opened_count, account.openedCount),
+                                style = MaterialTheme.typography.bodySmall,
+                                color = getDeeprItemTextColor(account.isFavourite),
+                            )
+                        }
                     }
                 }
 
@@ -361,6 +268,7 @@ fun DeeprItem(
                                 selected = isSelected,
                                 onClick = { onTagClick(tag.trim()) },
                                 label = { Text(tag.trim()) },
+                                shape = RoundedCornerShape(percent = 50),
                             )
                         }
                     }
@@ -401,3 +309,23 @@ fun formatDateTime(dateTimeString: String): String {
         return dateTimeString // fallback to raw string
     }
 }
+
+/**
+ * Formats a link's information into a shareable text format.
+ *
+ * @param item The link item containing name, link, and notes
+ * @return A formatted string containing the link's name (if not blank),
+ *         the link URL, and notes (if not blank), separated by double newlines
+ */
+fun formatShareText(item: GetLinksAndTags): String =
+    buildString {
+        if (item.name.isNotBlank()) {
+            append(item.name)
+            append("\n")
+        }
+        append(item.link)
+        if (item.notes.isNotBlank()) {
+            append("\n\n")
+            append(item.notes)
+        }
+    }

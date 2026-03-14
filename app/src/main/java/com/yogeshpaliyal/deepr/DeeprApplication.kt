@@ -13,7 +13,11 @@ import com.yogeshpaliyal.deepr.backup.ExportRepositoryImpl
 import com.yogeshpaliyal.deepr.backup.ImportRepository
 import com.yogeshpaliyal.deepr.backup.ImportRepositoryImpl
 import com.yogeshpaliyal.deepr.data.HtmlParser
+import com.yogeshpaliyal.deepr.data.LinkRepository
+import com.yogeshpaliyal.deepr.data.LinkRepositoryImpl
 import com.yogeshpaliyal.deepr.data.NetworkRepository
+import com.yogeshpaliyal.deepr.gdrive.DriveSyncManager
+import com.yogeshpaliyal.deepr.gdrive.DriveSyncManagerFactoryImpl
 import com.yogeshpaliyal.deepr.preference.AppPreferenceDataStore
 import com.yogeshpaliyal.deepr.review.ReviewManager
 import com.yogeshpaliyal.deepr.review.ReviewManagerFactory
@@ -33,6 +37,7 @@ import kotlinx.serialization.json.Json
 import org.koin.android.ext.koin.androidContext
 import org.koin.core.context.startKoin
 import org.koin.core.module.dsl.viewModel
+import org.koin.core.module.dsl.viewModelOf
 import org.koin.dsl.module
 
 class DeeprApplication : Application() {
@@ -68,9 +73,12 @@ class DeeprApplication : Application() {
 
                 single { AppPreferenceDataStore(androidContext()) }
 
-                single<ExportRepository> { ExportRepositoryImpl(androidContext(), get()) }
+                single<LinkRepository> { LinkRepositoryImpl(androidContext(), get()) }
 
-                single<ImportRepository> { ImportRepositoryImpl(androidContext(), get()) }
+                single<ExportRepository> { ExportRepositoryImpl(androidContext(), get()) }
+                single<DriveSyncManager> { DriveSyncManagerFactoryImpl.create(androidContext(), get()) }
+
+                single<ImportRepository> { ImportRepositoryImpl(androidContext(), get(), get()) }
 
                 single<SyncRepository> { SyncRepositoryImpl(androidContext(), get(), get()) }
 
@@ -90,14 +98,14 @@ class DeeprApplication : Application() {
                     }
                 }
 
-                viewModel { AccountViewModel(get(), get(), get(), get(), get(), get(), get()) }
+                viewModelOf(::AccountViewModel)
 
                 single {
                     HtmlParser()
                 }
 
                 single {
-                    NetworkRepository(get(), get())
+                    NetworkRepository(get())
                 }
 
                 single<LocalServerRepository> {

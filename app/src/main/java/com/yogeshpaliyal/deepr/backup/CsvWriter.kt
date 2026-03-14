@@ -1,14 +1,14 @@
 package com.yogeshpaliyal.deepr.backup
 
 import com.opencsv.CSVWriter
-import com.yogeshpaliyal.deepr.ListDeeprWithTagsAsc
+import com.yogeshpaliyal.deepr.GetLinksForBackup
 import com.yogeshpaliyal.deepr.util.Constants
 import java.io.OutputStream
 
 class CsvWriter {
     fun writeToCsv(
         outputStream: OutputStream,
-        data: List<ListDeeprWithTagsAsc>,
+        data: List<GetLinksForBackup>,
     ) {
         outputStream.bufferedWriter().use { writer ->
             // Write Header
@@ -23,6 +23,8 @@ class CsvWriter {
                         Constants.Header.NOTES,
                         Constants.Header.TAGS,
                         Constants.Header.THUMBNAIL,
+                        Constants.Header.IS_FAVOURITE,
+                        Constants.Header.PROFILE_NAME,
                     ),
                 )
                 // Write Data
@@ -34,8 +36,10 @@ class CsvWriter {
                             item.openedCount.toString(),
                             item.name,
                             item.notes,
-                            item.tagsNames ?: "",
+                            item.tags ?: "",
                             item.thumbnail,
+                            item.isFavourite.toString(),
+                            item.profileName,
                         ),
                     )
                 }

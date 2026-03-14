@@ -1,25 +1,18 @@
 package com.yogeshpaliyal.deepr.ui.screens
 
 import android.content.Intent
-import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.consumeWindowInsets
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
-import androidx.compose.material3.Card
-import androidx.compose.material3.CardDefaults
-import androidx.compose.material3.ContainedLoadingIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
-import androidx.compose.material3.ExperimentalMaterial3ExpressiveApi
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
@@ -32,14 +25,13 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
-import androidx.compose.runtime.snapshots.SnapshotStateList
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalLayoutDirection
 import androidx.compose.ui.res.stringResource
-import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.LayoutDirection
 import androidx.compose.ui.unit.dp
@@ -49,17 +41,26 @@ import com.google.accompanist.permissions.ExperimentalPermissionsApi
 import com.yogeshpaliyal.deepr.BuildConfig
 import com.yogeshpaliyal.deepr.MainActivity
 import com.yogeshpaliyal.deepr.R
+import com.yogeshpaliyal.deepr.ui.LocalNavigator
+import com.yogeshpaliyal.deepr.ui.TopLevelRoute
 import com.yogeshpaliyal.deepr.ui.components.LanguageSelectionDialog
+import com.yogeshpaliyal.deepr.ui.components.ProfileSelectionDialog
 import com.yogeshpaliyal.deepr.ui.components.ServerStatusBar
+import com.yogeshpaliyal.deepr.ui.components.SettingsItem
+import com.yogeshpaliyal.deepr.ui.components.SettingsSection
+import com.yogeshpaliyal.deepr.ui.components.ThemeSelectionDialog
 import com.yogeshpaliyal.deepr.util.LanguageUtil
 import com.yogeshpaliyal.deepr.viewmodel.AccountViewModel
 import compose.icons.TablerIcons
 import compose.icons.tablericons.AlertTriangle
 import compose.icons.tablericons.ArrowLeft
-import compose.icons.tablericons.ChevronRight
+import compose.icons.tablericons.Clipboard
 import compose.icons.tablericons.Download
+import compose.icons.tablericons.ExternalLink
+import compose.icons.tablericons.Folders
 import compose.icons.tablericons.InfoCircle
 import compose.icons.tablericons.Language
+import compose.icons.tablericons.Moon
 import compose.icons.tablericons.Photo
 import compose.icons.tablericons.Server
 import compose.icons.tablericons.Settings
@@ -68,16 +69,27 @@ import compose.icons.tablericons.Star
 import compose.icons.tablericons.Upload
 import org.koin.androidx.compose.koinViewModel
 
-data object Settings
+object Settings : TopLevelRoute {
+    override val icon: ImageVector
+        get() = TablerIcons.Settings
+    override val label: Int
+        get() = R.string.settings
+
+    @Composable
+    override fun Content(windowInsets: WindowInsets) {
+        SettingsScreen(windowInsets)
+    }
+}
 
 @OptIn(ExperimentalMaterial3Api::class, ExperimentalPermissionsApi::class)
 @Composable
 fun SettingsScreen(
-    backStack: SnapshotStateList<Any>,
+    windowInsets: WindowInsets,
     modifier: Modifier = Modifier,
     viewModel: AccountViewModel = koinViewModel(),
 ) {
     val context = LocalContext.current
+    val navigatorContext = LocalNavigator.current
 
     // Collect the shortcut icon preference state
     val useLinkBasedIcons by viewModel.useLinkBasedIcons.collectAsStateWithLifecycle()
@@ -86,11 +98,23 @@ fun SettingsScreen(
     val languageCode by viewModel.languageCode.collectAsStateWithLifecycle()
     var showLanguageDialog by remember { mutableStateOf(false) }
 
+    // Collect theme preference state
+    val themeMode by viewModel.themeMode.collectAsStateWithLifecycle()
+    var showThemeDialog by remember { mutableStateOf(false) }
+
     // Collect default page preference state
     val defaultPageFavourites by viewModel.defaultPageFavouritesEnabled.collectAsStateWithLifecycle()
     val isThumbnailEnable by viewModel.isThumbnailEnable.collectAsStateWithLifecycle()
+    val showOpenCounter by viewModel.showOpenCounter.collectAsStateWithLifecycle()
+    val clipboardLinkDetectionEnabled by viewModel.clipboardLinkDetectionEnabled.collectAsStateWithLifecycle()
+
+    // Collect profiles and silent save profile preference
+    val allProfiles by viewModel.allProfiles.collectAsStateWithLifecycle()
+    val silentSaveProfileId by viewModel.silentSaveProfileId.collectAsStateWithLifecycle()
+    var showSilentSaveProfileDialog by remember { mutableStateOf(false) }
 
     Scaffold(
+        contentWindowInsets = windowInsets,
         modifier = modifier.fillMaxSize(),
         topBar = {
             Column {
@@ -102,7 +126,7 @@ fun SettingsScreen(
                         val isRtl = LocalLayoutDirection.current == LayoutDirection.Rtl
 
                         IconButton(onClick = {
-                            backStack.removeLastOrNull()
+                            navigatorContext.removeLast()
                         }) {
                             Icon(
                                 TablerIcons.ArrowLeft,
@@ -120,8 +144,8 @@ fun SettingsScreen(
                 ServerStatusBar(
                     onServerStatusClick = {
                         // Navigate to LocalNetworkServer screen when status bar is clicked
-                        if (backStack.lastOrNull() !is LocalNetworkServer) {
-                            backStack.add(LocalNetworkServer)
+                        if (navigatorContext.getLast() !is LocalNetworkServer) {
+                            navigatorContext.add(LocalNetworkServer)
                         }
                     },
                 )
@@ -144,7 +168,7 @@ fun SettingsScreen(
                     title = stringResource(R.string.backup),
                     description = "Export to CSV, Local file sync, Auto backup",
                     onClick = {
-                        backStack.add(BackupScreen)
+                        navigatorContext.add(BackupScreen)
                     },
                 )
 
@@ -153,17 +177,19 @@ fun SettingsScreen(
                     title = stringResource(R.string.restore),
                     description = "Import from CSV, Bookmarks, and other formats",
                     onClick = {
-                        backStack.add(RestoreScreen)
+                        navigatorContext.add(RestoreScreen)
                     },
                 )
             }
+
+            DriveSettingsItem()
 
             SettingsSection("Others") {
                 SettingsItem(
                     TablerIcons.Server,
                     title = stringResource(R.string.local_network_server),
                     onClick = {
-                        backStack.add(LocalNetworkServer)
+                        navigatorContext.add(LocalNetworkServer)
                     },
                 )
 
@@ -206,6 +232,20 @@ fun SettingsScreen(
                 )
 
                 SettingsItem(
+                    TablerIcons.Moon,
+                    title = stringResource(R.string.theme),
+                    description =
+                        when (themeMode) {
+                            "light" -> stringResource(R.string.theme_light)
+                            "dark" -> stringResource(R.string.theme_dark)
+                            else -> stringResource(R.string.system_default)
+                        },
+                    onClick = {
+                        showThemeDialog = true
+                    },
+                )
+
+                SettingsItem(
                     TablerIcons.Star,
                     title = stringResource(R.string.default_page),
                     description =
@@ -236,6 +276,47 @@ fun SettingsScreen(
                         Switch(
                             checked = isThumbnailEnable,
                             onCheckedChange = { viewModel.setIsThumbnailEnable(it) },
+                        )
+                    },
+                )
+
+                SettingsItem(
+                    TablerIcons.ExternalLink,
+                    title = stringResource(R.string.show_open_counter),
+                    description = stringResource(R.string.show_open_counter_description),
+                    onClick = {
+                        viewModel.setShowOpenCounter(!showOpenCounter)
+                    },
+                    trailing = {
+                        Switch(
+                            checked = showOpenCounter,
+                            onCheckedChange = { viewModel.setShowOpenCounter(it) },
+                        )
+                    },
+                )
+
+                SettingsItem(
+                    TablerIcons.Folders,
+                    title = stringResource(R.string.silent_save_profile),
+                    description =
+                        allProfiles.find { it.id == silentSaveProfileId }?.name
+                            ?: stringResource(R.string.silent_save_profile_description),
+                    onClick = {
+                        showSilentSaveProfileDialog = true
+                    },
+                )
+
+                SettingsItem(
+                    TablerIcons.Clipboard,
+                    title = stringResource(R.string.clipboard_link_detection),
+                    description = stringResource(R.string.clipboard_link_detection_description),
+                    onClick = {
+                        viewModel.setClipboardLinkDetectionEnabled(!clipboardLinkDetectionEnabled)
+                    },
+                    trailing = {
+                        Switch(
+                            checked = clipboardLinkDetectionEnabled,
+                            onCheckedChange = { viewModel.setClipboardLinkDetectionEnabled(it) },
                         )
                     },
                 )
@@ -312,7 +393,7 @@ fun SettingsScreen(
                     TablerIcons.InfoCircle,
                     title = stringResource(R.string.about_us),
                     onClick = {
-                        backStack.add(AboutUs)
+                        navigatorContext.add(AboutUs)
                     },
                 )
             }
@@ -353,111 +434,31 @@ fun SettingsScreen(
                 onDismiss = { showLanguageDialog = false },
             )
         }
-    }
-}
 
-@Composable
-private fun SettingsSection(
-    title: String,
-    content: @Composable () -> Unit,
-) {
-    Column {
-        Text(
-            text = title,
-            style = MaterialTheme.typography.titleMedium,
-            fontWeight = FontWeight.Medium,
-            color = MaterialTheme.colorScheme.primary,
-            modifier = Modifier.padding(bottom = 8.dp),
-        )
-
-        Card(
-            colors =
-                CardDefaults.cardColors(
-                    containerColor = MaterialTheme.colorScheme.surfaceContainer,
-                ),
-        ) {
-            content()
-        }
-    }
-}
-
-@OptIn(ExperimentalMaterial3ExpressiveApi::class)
-@Composable
-private fun SettingsItem(
-    icon: androidx.compose.ui.graphics.vector.ImageVector,
-    title: String,
-    description: String? = null,
-    trailing: @Composable (() -> Unit)? = null,
-    onClick: ((onComplete: (() -> Unit)?) -> Unit)? = null,
-    isDestructive: Boolean = false,
-    shouldShowLoading: Boolean = false,
-) {
-    var isLoading by remember { mutableStateOf(false) }
-
-    val contentColor =
-        if (isDestructive) {
-            MaterialTheme.colorScheme.error
-        } else {
-            MaterialTheme.colorScheme.onSurface
-        }
-
-    Row(
-        modifier =
-            Modifier
-                .fillMaxWidth()
-                .then(
-                    if (onClick != null) {
-                        Modifier.clickable(true, onClick = {
-                            if (shouldShowLoading) {
-                                isLoading = true
-                            }
-                            onClick { isLoading = false }
-                        })
-                    } else {
-                        Modifier
-                    },
-                ).padding(16.dp),
-        verticalAlignment = Alignment.CenterVertically,
-    ) {
-        Icon(
-            imageVector = icon,
-            contentDescription = null,
-            tint = contentColor,
-            modifier = Modifier.size(24.dp),
-        )
-
-        Spacer(modifier = Modifier.width(16.dp))
-
-        Column(
-            modifier = Modifier.weight(1f),
-        ) {
-            Text(
-                text = title,
-                style = MaterialTheme.typography.bodyLarge,
-                color = contentColor,
+        // Theme Selection Dialog
+        if (showThemeDialog) {
+            ThemeSelectionDialog(
+                currentThemeMode = themeMode,
+                onThemeSelect = { selectedTheme ->
+                    viewModel.setThemeMode(selectedTheme)
+                    showThemeDialog = false
+                },
+                onDismiss = { showThemeDialog = false },
             )
-            if (description != null) {
-                Text(
-                    text = description,
-                    style = MaterialTheme.typography.bodySmall,
-                    color =
-                        if (isDestructive) {
-                            MaterialTheme.colorScheme.error.copy(alpha = 0.7f)
-                        } else {
-                            MaterialTheme.colorScheme.onSurfaceVariant
-                        },
-                )
-            }
         }
 
-        trailing?.invoke()
-
-        if (onClick != null && trailing == null && !isLoading) {
-            Icon(imageVector = TablerIcons.ChevronRight, contentDescription = "Go")
-        }
-
-        if (isLoading) {
-            ContainedLoadingIndicator(modifier = Modifier.size(32.dp))
+        // Silent Save Profile Selection Dialog
+        if (showSilentSaveProfileDialog) {
+            ProfileSelectionDialog(
+                profiles = allProfiles,
+                currentProfileId = silentSaveProfileId,
+                onProfileSelect = { selectedProfileId ->
+                    viewModel.setSilentSaveProfile(selectedProfileId)
+                    showSilentSaveProfileDialog = false
+                },
+                onDismiss = { showSilentSaveProfileDialog = false },
+                title = stringResource(R.string.silent_save_profile),
+            )
         }
     }
 }

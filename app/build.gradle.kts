@@ -18,38 +18,51 @@ android {
         applicationId = "com.yogeshpaliyal.deepr"
         minSdk = 24
         targetSdk = 36
-        versionCode = 19
-        versionName = "1.0.18"
+        versionCode = 27
+        versionName = "1.0.26"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
+        testInstrumentationRunnerArguments += mapOf(
+            "clearPackageData" to "true",
+        )
+    }
+
+    testOptions {
+        execution = "ANDROIDX_TEST_ORCHESTRATOR"
     }
 
     productFlavors {
-        create("free") {
+        create("github") {
             isDefault = true
         }
-        create("freePlaystore") {
+        create("free") {
 
         }
         create("pro") {
             applicationIdSuffix = ".pro"
-
         }
     }
 
     sourceSets {
-        // Configure the pro flavor to use the shared source set
-        named("pro") {
-            java.srcDirs("src/proFreePlaystore/java")
-            kotlin.srcDirs("src/proFreePlaystore/kotlin")
-            res.srcDirs("src/proFreePlaystore/res")
+        // Configure the github flavor to use the shared source set
+        named("github") {
+            java.srcDirs("src/freeGithub/java")
+            kotlin.srcDirs("src/freeGithub/kotlin")
+            res.srcDirs("src/freeGithub/res")
         }
 
-        // Configure the freePlayStore flavor to use the shared source set
-        named("freePlaystore") {
-            java.srcDirs("src/proFreePlaystore/java")
-            kotlin.srcDirs("src/proFreePlaystore/kotlin")
-            res.srcDirs("src/proFreePlaystore/res")
+        // Configure the pro flavor to use the shared source set
+        named("pro") {
+            java.srcDirs("src/proFree/java")
+            kotlin.srcDirs("src/proFree/kotlin")
+            res.srcDirs("src/proFree/res")
+        }
+
+        // Configure the free flavor to use the shared source set
+        named("free") {
+            java.srcDirs("src/proFree/java", "src/freeGithub/java")
+            kotlin.srcDirs("src/proFree/kotlin", "src/freeGithub/kotlin")
+            res.srcDirs("src/proFree/res", "src/freeGithub/res")
         }
     }
 
@@ -90,6 +103,10 @@ android {
             keyPassword = "android"
         }
     }
+
+    packagingOptions {
+        exclude("META-INF/DEPENDENCIES")
+    }
 }
 
 sqldelight {
@@ -115,6 +132,7 @@ dependencies {
     testImplementation(libs.ktor.client.mock)
     testImplementation(libs.kotlinx.coroutines.test)
     androidTestImplementation(libs.androidx.junit)
+    androidTestUtil(libs.orchestrator)
     androidTestImplementation(libs.androidx.espresso.core)
     androidTestImplementation(platform(libs.androidx.compose.bom))
     androidTestImplementation(libs.androidx.ui.test.junit4)
@@ -153,16 +171,18 @@ dependencies {
     implementation(libs.androidx.work.runtime.ktx)
     implementation(libs.androidx.documentfile)
 
-    // Add Firebase dependencies to pro and freePlayStore flavors specifically
     "proImplementation"(platform(libs.firebase.bom))
     "proImplementation"(libs.firebase.analytics)
     "proImplementation"(libs.firebase.crashlytics.ndk)
     "proImplementation"(libs.play.review)
+    "proImplementation"("com.google.android.gms:play-services-auth:21.5.0")
+    "proImplementation"("com.google.api-client:google-api-client-android:2.8.1")
+    "proImplementation"("com.google.apis:google-api-services-drive:v3-rev20230815-2.0.0")
 
-    "freePlaystoreImplementation"(platform(libs.firebase.bom))
-    "freePlaystoreImplementation"(libs.firebase.analytics)
-    "freePlaystoreImplementation"(libs.firebase.crashlytics.ndk)
-    "freePlaystoreImplementation"(libs.play.review)
+    "freeImplementation"(platform(libs.firebase.bom))
+    "freeImplementation"(libs.firebase.analytics)
+    "freeImplementation"(libs.firebase.crashlytics.ndk)
+    "freeImplementation"(libs.play.review)
 }
 
 kotlinter {

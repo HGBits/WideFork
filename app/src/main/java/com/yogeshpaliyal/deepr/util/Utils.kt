@@ -9,6 +9,9 @@ import androidx.core.graphics.createBitmap
 import androidx.core.graphics.drawable.IconCompat
 import androidx.core.net.toUri
 import com.yogeshpaliyal.deepr.R
+import java.text.SimpleDateFormat
+import java.util.Date
+import java.util.Locale
 
 fun openDeeplink(
     context: Context,
@@ -31,6 +34,63 @@ fun openDeeplink(
         // Optionally, show a toast or a dialog to the user that the link is invalid
         false
     }
+}
+
+fun openDeeplinkExternal(
+    context: Context,
+    link: String,
+): Boolean {
+    if (!isValidDeeplink(link)) return false
+    val normalizedLink = normalizeLink(link)
+
+    // The deep link URL the user clicked (e.g., a Flipkart product URL)
+    val deepLinkUri = normalizedLink.toUri()
+
+    // 1. Create the base Intent (ACTION_VIEW for the URL)
+    val baseIntent = Intent(Intent.ACTION_VIEW, deepLinkUri)
+
+    // 2. Query the system for all activities that can handle the baseIntent
+    val packageManager: PackageManager = context.packageManager
+    val resolvedInfoList = packageManager.queryIntentActivities(baseIntent, PackageManager.MATCH_ALL)
+
+    // 3. Create a list to hold the Intents for the Chooser dialog
+    val initialIntents: MutableList<Intent> = ArrayList()
+
+    // 4. Iterate through the resolved activities (apps and browsers)
+    for (info in resolvedInfoList) {
+        val packageName = info.activityInfo.packageName
+
+        // Check if the resolved activity is NOT the package that would open automatically.
+        // In this case, we're adding the browser as the 'initial intent' (which is the default behavior),
+        // and letting the Chooser handle the rest.
+
+        // **KEY STEP:** If the resolved activity is not the specific app (Flipkart) and is not a browser,
+        // it's an app we want to explicitly list.
+
+        // This creates a new intent for non-browser apps like your own deep-link app
+        val newIntent =
+            Intent(baseIntent).apply {
+                setPackage(packageName)
+            }
+        initialIntents.add(newIntent)
+    }
+
+    // 5. Create the Chooser Intent. The key trick here is sometimes using a generic intent
+    // for the primary Chooser target, but a simpler method is just using the baseIntent
+    // and adding all other options as 'initial intents'
+    val chooserIntent = Intent.createChooser(baseIntent, "Choose how to open the link")
+
+// 6. Add all the explicitly resolved app Intents to the chooser
+    if (initialIntents.isNotEmpty()) {
+        chooserIntent.putExtra(
+            Intent.EXTRA_INITIAL_INTENTS,
+            initialIntents.toTypedArray(),
+        )
+    }
+
+    // 7. Start the chooser
+    context.startActivity(chooserIntent)
+    return true
 }
 
 fun getShortcutAppIcon(
@@ -93,4 +153,13 @@ fun isValidDeeplink(link: String): Boolean {
     } catch (_: Exception) {
         false
     }
+}
+
+fun formatDateTime(milliseconds: Long?): String {
+    milliseconds ?: return ""
+    // Define the desired format
+    val sdf: SimpleDateFormat = SimpleDateFormat("dd MMM yyyy, hh:mm a", Locale.getDefault())
+    // Convert the milliseconds to a Date object and then format it
+    val dateString: String? = sdf.format(Date(milliseconds))
+    return dateString ?: ""
 }
